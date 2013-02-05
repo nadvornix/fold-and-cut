@@ -17,7 +17,6 @@ var HEIGHT = CANVAS.height;
 var STATE=0;
 var SELECTED=-1;
 
-
 var content = CANVAS.getContext("2d");
 var points = new Array();	//list of corners of polygon
 
@@ -45,6 +44,25 @@ function draw_circle(x,y,r,color){
 	content.fillStyle = color;
     content.fill();
     content.stroke();
+}
+
+function line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y) 
+{		//if lines (both given by two points) A1-A2 and B1-B2 intersect
+	var s1_x, s1_y, s2_x, s2_y;
+	s1_x = p1_x - p0_x;
+	s1_y = p1_y - p0_y;
+	s2_x = p3_x - p2_x;
+	s2_y = p3_y - p2_y;
+
+	var s, t;
+	s = (-s1_y * (p0_x - p2_x) + s1_x * (p0_y - p2_y)) / (-s2_x * s1_y + s1_x * s2_y);
+	t = ( s2_x * (p0_y - p2_y) - s2_y * (p0_x - p2_x)) / (-s2_x * s1_y + s1_x * s2_y);
+
+	if (s > 0 && s < 1 && t > 0 && t < 1) { // Collision detected 
+		return true;
+	}else {
+		return false;
+	}
 }
 
 function getMouseX(e){	//X coordinate of mouse (relative in canvas)
@@ -121,23 +139,10 @@ function redraw(){
 
 ///////////////////// LISTENERS:
 canvasY.addEventListener('click', function(e) {
-	var x;
-    var y;
-    if (e.pageX != undefined && e.pageY != undefined) {
-    x = e.pageX;
-    y = e.pageY;
-    }
-    else {
-    x = e.clientX + document.body.scrollLeft +
-            document.documentElement.scrollLeft;
-    y = e.clientY + document.body.scrollTop +
-            document.documentElement.scrollTop;
-    }
-    x -= CANVAS.offsetLeft;
-	y -= CANVAS.offsetTop;
-	
+	var x=getMouseX(e);
+    var y=getMouseY(e);
 
-	if (STATE==0){
+	if (STATE==0){	//addint new point
 		for (var i = 1; i<(points.length); i++) {	// do not let making points near existing (except first)
 			var point = points[i];
 			if (distance(point[0],point[1], x,y)<SNAP_DISTANCE){
@@ -145,17 +150,32 @@ canvasY.addEventListener('click', function(e) {
 			}
 		}
 
-		if (window.points.length>1){
+		if (window.points.length>=2){
+			lastX=points[points.length-1][0];
+			lastY=points[points.length-1][1];
+			for (var i = 1; i<(points.length); i++) {	// do not allow crossings
+				p1x = points[i-1][0];
+				p1y = points[i-1][1];
+				p2x = points[i][0];
+				p2y = points[i][1];
+				if (line_intersection(p1x, p1y, p2x, p2y,  lastX,lastY,x,y)){
+					return;
+				}
+			}
+
 			firstX = window.points[0][0];
 			firstY = window.points[0][1];
 			// alert(firstY+","+firstX)
-			if (distance(x,y,firstX,firstY)<SNAP_DISTANCE){
+			if (distance(x,y,firstX,firstY)<SNAP_DISTANCE){	// closing polygon - last edge
 				// alert(distance(x,y,firstX,firstY));
 				setState(1);
 				// window.points[(window.points.length)] = new Array(firstX, firstY);
 				redraw();
 				return;
 			}
+
+
+
 		}
 		window.points[(window.points.length)] = new Array(x, y);
 	}
