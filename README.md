@@ -1,4 +1,4 @@
 fold-and-cut
 ============
 
-Implementation of fold and cut algorithm
+Implementation of fold and cut algorithm.
