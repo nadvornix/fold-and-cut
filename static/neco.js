@@ -16,10 +16,11 @@ var HEIGHT = CANVAS.height;
 // STATE==1: polygon is closed and submiting and editing is enabled
 var STATE=0;
 var SELECTED=-1;
+var DRAGGING=-1;	//Are we moving with some point. -1 if not, otherwise index of point
 
 var content = CANVAS.getContext("2d");
 var points = new Array();	//list of corners of polygon
-
+var pointsBak = new Array();	//copy of ^, used when needed recover from crossing
 ///////////////////
 
 function distance(x1,y1,x2,y2){
@@ -65,6 +66,21 @@ function line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y)
 	}
 }
 
+function sqruare(x) { return x * x }
+function distanceSquared(x1,y1, x2, y2) { return sqruare(x1 - x2) + sqruare(y1- y2) }
+function distToSegmentSquared(x,y, Ax,Ay, Bx,By) {
+  var l2 = distanceSquared(Ax,Ay, Bx,By);
+  if (l2 == 0) return distanceSquared(x,y, Ax,By);
+  var t = ((x - Ax) * (Bx - Ax) + (y - Ay) * (By - Ay)) / l2;
+  if (t < 0) return distanceSquared(x,y, Ax,Ay);
+  if (t > 1) return distanceSquared(x,y, Bx,By);
+  return distanceSquared(x,y, Ax + t * (Bx - Ax),
+                     Ay + t * (By - Ay));
+}
+function distToSegment(x,y, Ax,Ay, Bx,By) { 
+	return Math.sqrt(distToSegmentSquared(x,y, Ax,Ay, Bx,By));
+}
+
 function getMouseX(e){	//X coordinate of mouse (relative in canvas)
 	var x;
     if (e.pageX != undefined ) {
@@ -96,6 +112,70 @@ function setState(state){
 		button=$("#SentButton")[0];
 		button.disabled=false;
 	}
+}
+
+function isCrossing(ps){	//check if there is some crossing in polygon with verticies ps
+	for (var i = 0; i<(ps.length); i++) {	// do not allow crossings
+		for (var j=0; j<ps.length; j++){
+			if (j!=i){
+				if (i==0){
+					pointA1= points[ps.length-1]
+					pointA2= points[0]
+				}
+				else{
+					pointA1= points[i-1]
+					pointA2= points[i]
+				}				
+				pA1x = pointA1[0];
+				pA1y = pointA1[1];
+				pA2x = pointA2[0];
+				pA2y = pointA2[1];
+
+				if (j==0){
+					pointB1= points[ps.length-1]
+					pointB2= points[0]
+				}
+				else{
+					pointB1= points[j-1]
+					pointB2= points[j]
+				}				
+				pB1x = pointB1[0];
+				pB1y = pointB1[1];
+				pB2x = pointB2[0];
+				pB2y = pointB2[1];
+
+				if (line_intersection(pA1x, pA1y, pA2x, pA2y,  pB1x,pB1y,pB2x,pB2y)){
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+function selectPoint(index){
+	SELECTED=index;
+	$("#removePointButton")[0].disabled=false;
+}
+function unselectPoint(){
+	SELECTED=-1;
+	$("#removePointButton")[0].disabled=true;
+}
+
+function removePoint(e){
+	var pbak  = points.slice();
+	
+	if (STATE==1 && SELECTED!=-1 && points.length>3){
+		points.splice(SELECTED, 1); 
+		unselectPoint();
+	}
+	else if (STATE==0 ){
+		points.splice(points.length-1, 1);
+	}
+	if (isCrossing(points)){
+		points=pbak;
+	}
+	redraw();
 }
 
 
@@ -134,15 +214,94 @@ function redraw(){
 			draw_circle(points[i][0], points[i][1], 5,"red");
 		}
 	}
+
+	if (window.points.length>0){
+		$("#removePointButton")[0].disabled=false;
+	}
+	else {
+		$("#removePointButton")[0].disabled=true;
+	}
 }
  
 
 ///////////////////// LISTENERS:
-canvasY.addEventListener('click', function(e) {
+
+canvasY.addEventListener('mousemove', function(e) {
+	redraw();
+	var x=getMouseX(e);
+    var y=getMouseY(e);
+    var list_size = (points.length);
+
+	if (STATE==1 && DRAGGING!=-1){	//Draging point around
+		points[DRAGGING][0]=x;
+		points[DRAGGING][1]=y;
+	}
+	else if (STATE==0){
+	    //snaping:
+		if(list_size >= 1) {
+			firstX = window.points[0][0];
+			firstY = window.points[0][1];
+			if (distance(x,y,firstX,firstY)<SNAP_DISTANCE){
+				x=firstX;
+				y=firstY;
+			}
+			var bod = points[(list_size-1)];
+			draw_line(bod[0], bod[1], x,y);
+		}
+	}
+});
+
+$('#canvasY').mousedown(function(e) {
 	var x=getMouseX(e);
     var y=getMouseY(e);
 
-	if (STATE==0){	//addint new point
+    if (!isCrossing(points)){
+    	for (var i=0; i<points.length; i++){
+    		pointsBak[i]=points[i].slice(0);
+    	}
+   	    // window.pointsBak=points.slice();
+    }
+
+ 	if (STATE==1){
+		for (var i = (points.length)-1; i>=0; --i) {	//START DRAGGING
+			var point = points[i];
+			if (distance(point[0],point[1], x,y) < SNAP_DISTANCE){
+				DRAGGING=i;
+				selectPoint(i);
+				return;
+			}
+		}
+ 
+		for (var i = 0; i<(points.length); i++) {
+			if (i==0){
+				p1 = points[0];
+				p2 = points[points.length-1];
+			}
+			else {
+				p1 = points[i];
+				p2 = points[i-1];
+			}
+
+			if (distToSegment(x,y,p1[0],p1[1],p2[0],p2[1])<SNAP_DISTANCE){	//adding new point
+				newPoints = points.slice(0,i);
+				newPoints.push([x,y]);
+				newPoints= newPoints.concat(points.slice(i, points.length));
+				points=newPoints;
+				selectPoint(i);
+				break;
+			}
+		}
+
+
+
+	}
+})
+
+$('#canvasY').mouseup(function(e) {
+  	var x=getMouseX(e);
+    var y=getMouseY(e);
+
+	if (STATE==0){	//adding new point when first drawing
 		for (var i = 1; i<(points.length); i++) {	// do not let making points near existing (except first)
 			var point = points[i];
 			if (distance(point[0],point[1], x,y)<SNAP_DISTANCE){
@@ -151,78 +310,50 @@ canvasY.addEventListener('click', function(e) {
 		}
 
 		if (window.points.length>=2){
-			lastX=points[points.length-1][0];
-			lastY=points[points.length-1][1];
-			for (var i = 1; i<(points.length); i++) {	// do not allow crossings
-				p1x = points[i-1][0];
-				p1y = points[i-1][1];
-				p2x = points[i][0];
-				p2y = points[i][1];
-				if (line_intersection(p1x, p1y, p2x, p2y,  lastX,lastY,x,y)){
-					return;
-				}
-			}
-
 			firstX = window.points[0][0];
 			firstY = window.points[0][1];
-			// alert(firstY+","+firstX)
 			if (distance(x,y,firstX,firstY)<SNAP_DISTANCE){	// closing polygon - last edge
-				// alert(distance(x,y,firstX,firstY));
 				setState(1);
-				// window.points[(window.points.length)] = new Array(firstX, firstY);
 				redraw();
 				return;
 			}
 
-
-
 		}
+		
 		window.points[(window.points.length)] = new Array(x, y);
+		if (isCrossing(points)){
+			points.splice(points.length-1,1);	//If crossing then revert change
+			return;
+		}
 	}
 	else if (STATE==1){
-		SELECTED=-1;
-		for (var i = (points.length)-1; i>=0  ; --i) {
+		unselectPoint();
+		for (var i = 0; i<points.length  ; i++) {
 			var point = points[i];
-			if (distance(point[0],point[1], x,y)<SNAP_DISTANCE){
-				SELECTED=i;
+			if (distance(point[0],point[1], x, y)<SNAP_DISTANCE){
+				selectPoint(i);
+			}
+		}
+
+		if (DRAGGING!=-1){
+			DRAGGING=-1;
+			if (isCrossing(points)){
+				for (var i=0; i<points.length; i++){
+					points[i]=pointsBak[i];
+				}
 			}
 		}
 	}
+
 	redraw();
-});
+})
 
-canvasY.addEventListener('mousemove', function(e) {
-	redraw();
-	if (STATE==1){
-		return;
-	}
-	
-	var x=getMouseX(e);
-    var y=getMouseY(e);
-    var list_size = (points.length);
 
-    //snaping:
-	if(list_size >= 1) {
-		firstX = window.points[0][0];
-		firstY = window.points[0][1];
-		if (distance(x,y,firstX,firstY)<SNAP_DISTANCE){
-			x=firstX;
-			y=firstY;
-		}
-		var bod = points[(list_size-1)];
-		draw_line(bod[0], bod[1], x,y);
-	}
-});
-
-// SentButton.addEventListener('mousemove', function(e) {
-// 	alert(1);
-// 	});
-
-SentButton.addEventListener("click", function (e){
+//////////////// 	NON-CANVAS
+SentButton.addEventListener("click", function (e){	//SUBMIT button
 	$.post("./process", { points: JSON.stringify(points) } ,function (data, textStatus, jqXHR){},"json");
 });
-
-
+removePointButton.addEventListener("click", removePoint);//remove Point button
 
 function loadExample(e){
 	link = e.target;
