@@ -1,5 +1,5 @@
 import os,sys,json
-
+import ss
 import flask as f
 app = f.Flask(__name__)
 
@@ -13,9 +13,20 @@ def process():
 	pointsS= f.request.form.get("points")
 	if (pointsS):
 		points = json.loads(pointsS)
-		print points
+		print pointsS
+		print "----"
 		print len(points)
-		
+		ss.LINES=[]
+		skeleton = ss.SS()
+		print skeleton
+		skeleton.create(list(map(tuple,points))) #converting to right format
+		size = ss.create_creases(skeleton)
+		#size = (lenx,leny, minx,maxx, minx, maxx)
+		print ss.LINES
+		print len(ss.LINES)
+		return json.dumps((size,ss.LINES))
+		# print ss.LINES
+		# print "/"
 	return f.render_template('index.html')
 
 if __name__ == "__main__":

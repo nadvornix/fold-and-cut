@@ -1,0 +1,61 @@
+body {
+	background-image: url('graphy.png'); 
+	background-repeat: repeat;
+}
+h1 {
+	margin-left: 1em;
+	font-family: 'Averia Gruesa Libre', sans-serif;
+	color:black;
+	font-size: 48;
+}
+
+.main {
+	margin-top: 2em;
+    margin-left: auto;
+    margin-right: auto;
+	width: 960px;
+	min-height: 600;
+}
+canvas {
+	background-color: white;
+	border-radius: 15px;
+}
+.drawing {
+	float:left;
+	width:560px;
+}
+.instruction li {
+	padding-top: 1em;
+	line-height: 120%;
+}
+.instruction {
+	background-color:rgba(255,255,255,0.5);
+	border-radius: 15px;
+	width:350px;
+	float:left;
+	margin-left:2em;
+}
+.instruction hr {
+	width:80%;
+}
+.removepoint {
+	margin-top:2em;
+}
+.removepoint {
+	margin-left: 2em;
+}
+.footer {
+	text-align: center;
+	/*margin-left: auto;*/
+    margin-right: auto;
+	/*width: 100px;*/
+}
+.moreinfo {
+	/*top: 2em;*/
+	background-color:rgba(255,255,255,0.5);
+	border-radius: 15px;
+	margin-top:10px;
+	padding:10px;
+	width: 530px;
+
+}

@@ -2,17 +2,44 @@
 	<head>
 		<title>Fold&amp;Cut Magic</title>
 		<script type="text/javascript" src="static/jquery.js"></script>
+		<link href='http://fonts.googleapis.com/css?family=Averia+Gruesa+Libre' rel='stylesheet' type='text/css'>
+		<link rel="stylesheet" type="text/css" href="static/style.css">
 	</head>
 	<body>
-		<h1>Fold &amp; Cut Magic</h1>
-		<canvas id="canvasY" width="505" height="505"></canvas>
-			<p><input id="removePointButton" type="button" disabled="1" value="Remove point"/>
-			<p><input id="SentButton" type="button" disabled="1" value="Create crease pattern"/>
-	        <p><a href="#" class="loadExample" num="0">Load example 1</a>
-	        <p><a href="#" class="loadExample" num="1">Load example 2</a>
+		<a href="https://github.com/nadvornix/fold-and-cut"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub"></a>
+		<div class="main">
+			<a href="." style="text-decoration: none"><h1>Fold &amp; Cut Magic</h1></a>
+			<div class="drawing">
+				<canvas id="canvasY" width="550" height="560"></canvas>
+				<div class="moreinfo"> 
+	    <h2>More information</h2>
+	    <p> This is implementation of algorithm for solving Fold and Cut problem by Erik &amp; Martin Demaine and Anna Lubiw. 
+	    <p> <a href="http://erikdemaine.org/foldcut/">Erik Demaine's page on problem</a>.
+	    <p> <a href="https://github.com/nadvornix/fold-and-cut">Source code of this page on github</a>.
 
+	    <div class="footer"> © 2013 <a href="http://nadvornik.me/">Jiří Nádvorník</a></div>
+	    </div>
+			</div>
+			<div class="instruction">
+				<ol>
+					<li>Draw desired shape, or load example:<br>
+			        <a href="#" class="loadExample" num="1">Tortoise</a><br>
+			        <a href="#" class="loadExample" num="0">Star of David</a>
+					<li><input id="SentButton" type="button" disabled="1" value="Create crease pattern"/>
+					<li> Print & fold by all lines (red: mountains, blue: valleys)
+					<li> Cut whole shape with one straight cut
+				</ol>
+				<hr>
+				<div class="removepoint">
+				<p><input id="removePointButton" type="button" disabled="1" value="Remove point"/>
+		    	</div>
+		    </div>
+	    </div>
+	     <div style="clear:both;"/>
+	     <br>
+	    
 
-		<script type="text/javascript" src="static/neco.js"></script>
+		<script type="text/javascript" src="static/foldandcut.js"></script>
 
 	</body>
 </html>
