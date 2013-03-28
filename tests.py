@@ -223,6 +223,35 @@ class TestUtils(unittest.TestCase):
 		self.assertTrue(pointOnSegment(0,0,5,5, 5,5))
 		self.assertTrue(pointOnSegment(0,0,5,5, 5.00001,5.00001))#there should be litlle colerance on corners
 
+	def test_inflate_rectangle(self):
+		minX, maxX, minY,maxY = inflate_rectangle(10, 30, 20,40, -0.5) # rectangle with half size
+		self.assertAlmostEqual(minX,15)
+		self.assertAlmostEqual(maxX,25)
+		self.assertAlmostEqual(minY,25)
+		self.assertAlmostEqual(maxY,35)
+
+	def test_colorString2RGB(self):
+		r,g,b = colorString2RGB("#00A0FF")
+		self.assertAlmostEqual(r,0)
+		self.assertAlmostEqual(g,0.625)
+		self.assertAlmostEqual(b,0.99609375)
+
+
+	def test_clip_lines(self):
+		lines = [(0,0, -10,-10, "#00FF00"), #(Ax,Ay, Bx,By, color)
+				 (20,40, 40,40, "#FF0000"),
+				 (30,10, 60,40, "#0000FF"),
+				 (20,30, 20,10, "#aabbcc")
+				]
+		border = (10,50,20,40)	#minX,maxX, minY, maxY
+		shouldBe=[(20,40, 40,40, "#FF0000"),
+				  (40,20, 50,30, "#0000FF"),
+				  (20,20, 20,30, "#aabbcc")
+				  ]
+		result = clip_lines(lines, border)
+		for l in shouldBe:
+			lRev=l[2:4]+l[0:2]+(l[4],) # l with swapped order of points
+			self.assertTrue(l in result or lRev in result)
 
 
 class TestPoint(unittest.TestCase):

@@ -32,6 +32,18 @@
 				<hr>
 				<div class="removepoint">
 				<p><input id="removePointButton" type="button" disabled="1" value="Remove point"/>
+				<br>
+				<br>
+				<form action="./svg" method="POST">
+				<p><input id="downloadSVGButton" type="submit" disabled="1" value="Download as SVG"/>
+					<input id="SVGdata" name="data" type="hidden" value="666">
+					<input id="SVGsize" name="size" type="hidden" value="666">
+				</form>
+				<form action="./pdf" method="POST">
+				<p><input id="downloadPDFButton" type="submit" disabled="1" value="Download as PDF"/>
+					<input id="PDFdata" name="data" type="hidden" value="777">
+					<input id="PDFsize" name="size" type="hidden" value="777">
+		    	</form>
 		    	</div>
 		    </div>
 	    </div>

@@ -109,6 +109,9 @@ class SS():
 	def create(self, polygon):
 		"Convert polygon from list of vertices to straight skeleton"
 		
+		# convert to [(x,y), ....]
+		polygon = map(lambda x: tuple(map(int,x)), polygon)
+		
 		# polygon has to be in counterclockwise order (if coordinates are interpreted as cartesian)
 		if clockwisePolygon(polygon):
 			polygon.reverse()
@@ -158,7 +161,7 @@ class SS():
 			point.normalize()
 
 	def run_CGAL(self, polygon):
-		print polygon
+		# print polygon
 		pointsS = "\n".join(map(lambda x: "%s %s"%x, polygon))	# points in pairs per line
 
 		p = Popen("./ss", shell=True, stdin=PIPE, stdout=PIPE)

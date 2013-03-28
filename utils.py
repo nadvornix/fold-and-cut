@@ -80,7 +80,7 @@ def getIntersectPoint(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 				x = p3[0]
 				y = (m1 * x) + b1
 			else:
-				assert false
+				assert False
 
 		return (x,y)
 	else:
@@ -328,3 +328,81 @@ def avg(*l):
 
 def unique(l):
 	return list(set(l))
+
+def inflate_rectangle(minX, maxX, minY,maxY, ratio=0.2):
+	"enlarge rectangle by ratio (same -> ratio=0.0)"
+	lenX=maxX-minX
+	lenY=maxY-minY
+
+	dX=(lenX*ratio)/2
+	dY=(lenY*ratio)/2
+
+	return (minX-dX, maxX+dX, minY-dY,maxY+dY)
+
+
+def clip(line, border):
+	"clip single line"
+
+	minX,maxX, minY, maxY = border
+	Ax,Ay, Bx,By, color = line
+
+	if (minX<=Ax<=maxX and minX<=Bx<=maxX and
+		minY<=Ay<=maxY and minY<=By<=maxY):
+		return line
+
+	clipped = False
+
+	i = lineSegmentsIntersection(Ax,Ay, Bx,By,  minX,minY, maxX,minY) # top _
+	if i:
+		clipped=True
+		Ix,Iy=i
+		if (Ay<Iy):
+			Ax,Ay=Ix,Iy
+		if (By<Iy):
+			Bx,By=Ix,Iy
+
+	i = lineSegmentsIntersection(Ax,Ay, Bx,By,  minX,maxY, maxX,maxY) # bottom _
+	if i:
+		clipped=True
+		Ix,Iy=i
+		if (Ay>Iy):
+			Ax,Ay=Ix,Iy
+		if (By>Iy):
+			Bx,By=Ix,Iy
+
+	i = lineSegmentsIntersection(Ax,Ay, Bx,By,  minX,minY, minX,maxY) # left |
+	if i:
+		clipped=True
+		Ix,Iy=i
+		if (Ax<Ix):
+			Ax,Ay=Ix,Iy
+		if (Bx<Ix):
+			Bx,By=Ix,Iy
+	
+	i = lineSegmentsIntersection(Ax,Ay, Bx,By,  maxX,maxY, maxX,minY) # right |
+	if i:
+		clipped=True
+		Ix,Iy=i
+		if (Ax>Ix):
+			Ax,Ay=Ix,Iy
+		if (Bx>Ix):
+			Bx,By=Ix,Iy
+	if clipped:
+		return Ax,Ay,Bx,By,color
+	else:
+		return None
+
+def clip_lines(lines, border):
+	" clip lines to right position and clip them "
+
+	clipped = map(lambda l:clip(l, border), lines)
+	return filter(lambda l:l != None, clipped)
+
+def colorString2RGB(s):
+	"converts '#5abbff' to something like (0.2, 0.5, 0.99609375)"
+	def c2n(c):
+		"converts single hex digit to 0.0-0.99609375"
+		return int(c,16)/256.0
+	if len(s)==4:
+		s="#"+s[1]+s[1]+s[2]+s[2]+s[3]+s[3]
+	return c2n(s[1:3]),c2n(s[3:5]),c2n(s[5:7])

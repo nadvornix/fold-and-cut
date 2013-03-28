@@ -331,12 +331,11 @@ def drawPerpendicularSS(startP, face,openFace, adjacentE, depth=0, last=None):
 			print "outside"
 
 def create_creases(ss):
-
 	for v in ss.points:
 		POINTS.append((v.x,v.y))
 	# for x,y in :
 		# POINTS.append((x,y))
-	global maxy, miny, maxx, minx
+	global maxy, miny, maxx, minx,lenx,leny
 	maxy=max(map(lambda a: a.y,ss.points))+50
 	miny=min(map(lambda a: a.y,ss.points))-50
 	maxx=max(map(lambda a: a.x,ss.points))+50
@@ -393,15 +392,14 @@ def create_creases(ss):
 									startP=(vertex.x,vertex.y)
 									adjacentN = (prev,vertex,next)
 									drawPerpendicularSS(startP, halfFace, False, pairs(adjacentN), 0)
+								# else:
+								# 	drawline(vertex.x, vertex.y, vertex.x+20, vertex.y+20, "#000")
 	img=Image.new('RGB', (int(lenx), int(leny)), "#FFFFFF")
-	print lenx, minx,maxx
 	draw = ImageDraw.Draw(img)
 	for line in LINES:
 		x1,y1,x2,y2,color=line
-		print "(%s,%s) -- (%s,%s)" % (x1,y1,x2,y2)
 		draw.line((int(x1-minx), int(y1-miny), int(x2-minx), int(y2-miny)), fill=color)
 	done=[]
-	print len(LINES),"!!!"
 	# for point in ss.points:	#Debug: draw this graph
 	# 	done.append(point)
 	# 	for n in point.ss:
@@ -410,10 +408,15 @@ def create_creases(ss):
 	# 	for n in point.contour:
 	# 		if n not in done:
 	# 			draw.line((int(n.x-minx), int(n.y-miny), int(point.x-minx), int(point.y-miny)), fill="#FF0000")
+	return (minx,maxx, minx, maxx),LINES
+
+def drawit(lines):
+	img=Image.new('RGB', (int(lenx)+100, int(leny)+100), "#FFFFFF")
+	draw = ImageDraw.Draw(img)
+	for ax,ay,bx,by,color in lines:
+		draw.line((int(ax-minx), int(ay-miny), int(bx-minx), int(by-miny)), fill=color)
 	img.save("test.png")
-	return (lenx,leny, minx,maxx, minx, maxx)
-									# die()
-						# die()
+
 if __name__=="__main__":
 	polygon = [ 
 			(-1022,-100),
@@ -426,25 +429,43 @@ if __name__=="__main__":
 			(-1000,1000),
 	]
 
+	polygon = [[140, 311.7691453623979], [180, 311.7691453623979],
+	 [200, 277.12812921102034], [240, 277.12812921102034], 
+	 [260, 311.7691453623979], [300, 311.7691453623979], 
+	 [280, 277.12812921102034], [320, 277.12812921102034], 
+	 [340, 242.4871130596428], [380, 242.4871130596428], 
+	 [360, 207.84609690826525], [320, 207.84609690826525], 
+	 [300, 242.4871130596428], [260, 173.20508075688772], 
+	 [180, 173.20508075688772], [120, 277.12812921102034], 
+	 [160, 277.12812921102034]]
 
-	done=[]
-	for point in ss.points:	#Debug: draw this graph
-		done.append(point)
-		for n in point.ss:
-			if n not in done:
-				drawline(n.x,n.y, point.x, point.y)
-		for n in point.contour:
-			if n not in done:
-				drawline(n.x,n.y, point.x, point.y,color="#FF0000")
 
-	ss= SS()
-	ss.create(polygon)
-	create_creases(ss)
+	skeleton= SS()
+	skeleton.create(polygon)
+	create_creases(skeleton)
+
+	contour = filter(lambda p: p.is_contour(), skeleton.points)
+	minX=reduce(min, map(lambda p:p.x, contour))
+	maxX=reduce(max, map(lambda p:p.x, contour))
+	minY=reduce(min, map(lambda p:p.y, contour))
+	maxY=reduce(max, map(lambda p:p.y, contour))
+
+
+	print minX,maxX, minY, maxY
+	minX,maxX, minY, maxY = inflate_rectangle(minX,maxX, minY, maxY, 0.2)
+	print minX,maxX, minY, maxY
 	
+	LINES = clip_lines(LINES, (minX,maxX, minY,maxY))
 
-	# img=Image.new('RGB', (int(lenx)+100, int(leny)+100), "#FFFFFF")
-	# draw = ImageDraw.Draw(img)
-	# print maxy,miny,maxx,minx,lenx,leny
+	# done=[]
+	# for point in skeleton.points:	#Debug: draw this graph
+	# 	done.append(point)
+	# 	for n in point.ss:
+	# 		if n not in done:
+	# 			drawline(n.x,n.y, point.x, point.y, color="#000")
+	# 	for n in point.contour:
+	# 		if n not in done:
+	# 			drawline(n.x,n.y, point.x, point.y,color="#000")
 
-	# img.save("test.png")
+	drawit(LINES)
 	print ":-)"

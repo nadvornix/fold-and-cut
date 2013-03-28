@@ -244,6 +244,12 @@ function setState(state){
 	else {
 		button.disabled=true;
 	}
+	
+	if (state==2){
+		$("#downloadSVGButton")[0].disabled=false;
+		$("#downloadPDFButton")[0].disabled=false;
+	}
+
 	$("#removePointButton")[0].disabled=true;
 }
 
@@ -556,21 +562,24 @@ $('#canvasY').mouseup(function(e) {
 	redraw();
 })
 
-
 //////////////// 	NON-CANVAS
 SentButton.addEventListener("click", function (e){	//SUBMIT button
 	$.post("./process", { points: JSON.stringify(points) } , function (data, textStatus, jqXHR){
-		var size=data[0];		//(lenx,leny, minx,maxx, minx, maxx)
-		var lenx = size[0];
-		var leny = size[1];
-		var minx = size[2];
-		var maxx = size[3];
-		var miny = size[4];
-		var maxy = size[5];
+		var size=data[0];		//(minx,maxx, minx, maxx)
+		var minx = size[0];
+		var maxx = size[1];
+		var miny = size[2];
+		var maxy = size[3];
+		var lenx = maxx-minx;
+		var leny = maxy-miny;
 
-		var factorx=CANVAS.width/lenx;
-		var factory=CANVAS.height/leny;
-		var factor=Math.min(factorx,factory)
+		var factor=CANVAS.width/lenx;
+
+		CANVAS.height = leny*factor;
+
+		// var factory=CANVAS.height/leny;
+		// var factor=Math.min(factorx,factory)
+		
 		RESULT=new Array()
 		for (var i=0; i<data[1].length; i++){
 			x1=data[1][i][0];
@@ -586,6 +595,9 @@ SentButton.addEventListener("click", function (e){	//SUBMIT button
 						color,
 						];
 		}
+
+		$("#SVGdata")[0].value=JSON.stringify(RESULT);
+		$("#PDFdata")[0].value=JSON.stringify(RESULT);
 
 		setState(2);
 		redraw();
@@ -608,7 +620,7 @@ function removePoint(e){
 	}
 	redraw();
 }
-removePointButton.addEventListener("click", removePoint);//remove Point button
+$("#removePointButton").click(removePoint);//remove Point button
 
 function loadExample(e){
 	link = e.target;
@@ -623,6 +635,7 @@ function loadExample(e){
 		}
 	}
 	points = examplePolygons[number];
+	unselectPoint();
 	redraw();
 }
 
