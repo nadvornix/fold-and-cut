@@ -395,7 +395,7 @@ def clip(line, border):
 def clip_lines(lines, border):
 	" clip lines to right position and clip them "
 
-	clipped = map(lambda l:clip(l, border), lines)
+	clipped = map(lambda l: clip(l, border), lines)
 	return filter(lambda l:l != None, clipped)
 
 def colorString2RGB(s):
@@ -406,3 +406,71 @@ def colorString2RGB(s):
 	if len(s)==4:
 		s="#"+s[1]+s[1]+s[2]+s[2]+s[3]+s[3]
 	return c2n(s[1:3]),c2n(s[3:5]),c2n(s[5:7])
+
+
+
+def getPath(point,n,direction=0):
+	"""go still in direction point->n.
+	direction=0 means go as left as you can, direction=-1 means right"""
+	vertices=[n]
+
+	try:
+		next = n.forks(point, all=True)[direction]#most left
+		last=n
+		while not (next in vertices):
+			vertices.append(next)
+			tmp=next
+			try:
+				next = next.forks(last, all=True)[direction]
+			except IndexError:
+				next=last
+			last=tmp
+	except IndexError:
+		pass 	# first node is last
+	return vertices
+
+def getFace(point,n,returns):
+	p1=getPath(point,n,direction=0)
+	p2=getPath(n,point,direction=-1)
+
+	for v in p2:
+		if v not in p1:
+			p1.insert(0,v)	#prepend
+	openFace = p1[0]==p2[-1]
+	return p1,openFace
+
+def getContour(face):
+	for v in face:
+		for c in v.contour:
+			if (v in c.contour) and (c in face):
+				return (c,v)
+	return None
+
+def isContourE(e1,e2):
+	return e2 in e1.contour and e1 in e2.contour
+
+def sameEdge(e1,e2):
+	"If e1 and e2 [edges in (Point,Point) format] are same (regardless of order)"
+	(e1A,e1B),(e2A,e2B)=e1,e2
+	return ((e1A,e1B)==(e2A,e2B)) or ( (e1A,e1B)==(e2B, e2A) )
+
+def isEdgeIn(e,l):
+	"if edge e is in list l [edges are in (Point,Point) format]"
+	for e2 in l:
+		if sameEdge(e,e2):
+			return True
+	return False
+
+def otherFace(face,edge):
+	"around `edge` are two faces. This returns that distinct from `face`"
+	eA,eB=edge
+	f1,f1open=getFace(eA,eB)
+	f2,f2open=getFace(eB,eA)
+	f1l=len(intersection(face, f1))
+	f2l=len(intersection(face, f2))
+	if f1l==2:
+		return f1,f1open
+	elif f2l==2:
+		return f2,f2open
+	else:
+		assert False
