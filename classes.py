@@ -64,7 +64,7 @@ class Point():
 	def is_contour(self):
 		return len(self.contour)>0
 
-	def is_inner(self): #TODO: rename to is_ss
+	def is_inner(self):
 		return not self.is_contour()
 
 	def getFaces(self):	## NOT USED?
@@ -105,8 +105,8 @@ class Point():
 class SS():
 	point_tolerance=1.5 # if two points are closer than this they are considered equal (more or less)
 	font = ImageFont.truetype("g.ttf", 50)
-	MAXDEPTH=20
-	FRAME=1000
+	MAXDEPTH=0
+
 	def __init__(self):
 		self.POINTS=[]
 		self.drawedPoints=[]
@@ -182,13 +182,19 @@ class SS():
 		self.minY=reduce(min, map(lambda p:p.y, contour))
 		self.maxY=reduce(max, map(lambda p:p.y, contour))
 
-		
 		self.lenX=self.maxX-self.minX
 		self.lenY=self.maxY-self.minY
+
+		self.xmin,self.xmax, self.ymin,self.ymax = inflate_rectangle(self.minX, self.maxX, self.minY, self.maxY, 3)
+		
+		self.xlen=self.xmax-self.xmin
+		self.ylen=self.ymax-self.ymin
 
 		# stripe unnecessary border
 		self.stripeBorder()
 
+		# extend lines on border to border
+		self.extendBorderLines()
 
 
 
@@ -268,26 +274,35 @@ class SS():
 
 		outerFace=getPath(borderPoint, borderPoint.ss[0],direction=0)
 		
-		print borderPoint
-		print outerFace
-		print "---"
-
 		while True:
 			start = outerFace[-1]
-			path = getPath(start.ss[0], start, direction=0)
+			path = getPath(start,start.ss[0], direction=0)
 			
 			outerFace+=path
 
-			if borderPoint in path:
+			if borderPoint.ss[0] in path:
 				break
-			break
+			# break
 
-		print len(outerFace)
+		# for p in outerFace:
+		# 	print p
+		# 	self.drawPoint(p.x, p.y, color="#F55")
 
-		for p in outerFace:
-			print p
-			self.drawPoint(p.x, p.y, color="#F55")
+		for a,b in pairs(outerFace):
+			try:
+				a.ss.remove(b)
+			except ValueError:
+				pass
 
+			try:
+				b.ss.remove(a)
+			except ValueError:
+				pass
+
+		for p in list(self.points):
+			p.normalize()
+			if len(p.all)==0:
+				self.points.remove(p)
 
 
 	def get_point(self, x, y):
@@ -305,15 +320,6 @@ class SS():
 		for v in self.points:
 			self.POINTS.append((v.x,v.y))
 
-		# self.maxy=max(map(lambda a: a.y,self.points))+50
-		# self.miny=min(map(lambda a: a.y,self.points))-50
-		# self.maxx=max(map(lambda a: a.x,self.points))+50
-		# self.minx=min(map(lambda a: a.x,self.points))-50
-		# self.lenx=self.maxx-self.minx
-		# self.leny=self.maxy-self.miny
-
-		# return
-
 		done=[]
 		for point in self.points:	#Debug: draw this graph
 			done.append(point)
@@ -322,14 +328,14 @@ class SS():
 					self.drawline(n.x,n.y, point.x, point.y)
 			for n in point.contour:
 				if n not in done:
-					self.drawline(n.x,n.y, point.x, point.y,color="#FF0000")
+					self.drawline(n.x,n.y, point.x, point.y, color="#FF0000")
 
 		# Strategy: 1) take contour edge,
 		#			2) walk around and start perpendiculars for all verticies on incident faces
 		#				2a) draw perpendicular all all way to its end
 		edgesDone = []
 
-		for point in self.points[:]:
+		for pid, point in enumerate(self.points):
 			if point.is_contour():
 				for n in point.contour[:]:
 
@@ -339,9 +345,9 @@ class SS():
 						####	THIS WILL BE EXECUTED ONCE PER CONTOUR EDGE:
 						contourA,contourB=edge
 
-						# x=avg(contourA.x,contourB.x)
-						# y=avg(contourA.y,contourB.y)
-						# drawPoint(x+20, y+20, color="#0F0")
+						x=avg(contourA.x,contourB.x)
+						y=avg(contourA.y,contourB.y)
+						self.drawPoint(x, y, 3, color="#0FF")
 
 						halfFaceA,oA = getFace(point,n)
 						halfFaceB,oB = getFace(n,point)
@@ -351,10 +357,12 @@ class SS():
 							for i,vertex in enumerate(halfFace):
 								if vertex.is_inner():
 									prev=halfFace[i-1]
+									self.drawPoint(vertex.x, vertex.y, 3, color="#0F0")
 									if i==len(halfFace)-1:
 										next=halfFace[0]
 									else:
 										next=halfFace[i+1]
+
 
 									isecX,isecY = pointLineProjection(contourA.x,contourA.y,contourB.x,contourB.y, vertex.x,vertex.y)
 									aNext = angle(prev.x,prev.y, vertex.x,vertex.y, next.x,next.y)	#angle to next vertex
@@ -362,9 +370,11 @@ class SS():
 									if aNext>aIsec:	#if perpendicular goes to face (vs. go outside)
 										startP=(vertex.x,vertex.y)
 										adjacentN = (prev,vertex,next)
+										
+										self.drawPoint(vertex.x, vertex.y, 2)
 										self.drawPerpendicularSS(startP, halfFace, False, pairs(adjacentN), 0)
-									# else:
-									# 	drawline(vertex.x, vertex.y, vertex.x+20, vertex.y+20, "#000")
+										# else:
+										# 	drawline(vertex.x, vertex.y, vertex.x+20, vertex.y+20, "#000")
 		# img=Image.new('RGB', (int(lenx), int(leny)), "#FFFFFF")
 		# draw = ImageDraw.Draw(img)
 		# for line in LINES:
@@ -579,7 +589,26 @@ class SS():
 				# print "outside"
 
 	def inBox(self, x,y):
-		return self.minx<=x<=self.maxx and self.miny<=y<=self.maxy
+		return self.xmin<=x<=self.xmax and self.ymin<=y<=self.ymax
+
+	def extendBorderLines(self):
+		borderPoints=[]
+		for p in self.points:
+			if len(p.all)==1:
+				borderPoints.append(p)
+
+		# for p in borderPoints:
+		# 	self.drawPoint(int(p.x), int(p.y), color="#0F0")
+
+		for p in borderPoints:
+			n=p.all[0]
+			dx = p.x-n.x
+			dy = p.y-n.y
+			p.x = p.x+100*dx
+			p.y = p.y+100*dy
+
+		for p in self.points:
+			p.normalize()
 
 
 	def drawPoint(self, x,y,r=10,color="#FF00FF"):
@@ -597,16 +626,13 @@ class SS():
 		# draw.text((int(x-minx),int(y-miny)),text,fill=(0,0,0),font=font)
 
 	def drawit(self):
-		
-		xmin,xmax, ymin,ymax = inflate_rectangle(self.minX, self.maxX, self.minY, self.maxY, 0.2)
-		
-		xlen=xmax-xmin
-		ylen=ymax-ymin
+		# xoffset = (xlen+self.FRAME-self.lenX)/2 - self.minX
+		# yoffset = (ylen+self.FRAME-self.lenY)/2 - self.minY
 
-		xoffset = (xlen+self.FRAME-self.lenX)/2 - self.minX
-		yoffset = (ylen+self.FRAME-self.lenY)/2 - self.minY
+		xoffset=-self.xmin
+		yoffset=-self.ymin
 
-		img=Image.new('RGB', (int(xlen)+self.FRAME, int(ylen)+self.FRAME), "#FFFFFF")
+		img=Image.new('RGB', (int(self.xlen), int(self.ylen)), "#FFFFFF")
 		draw = ImageDraw.Draw(img)
 
 		for ax,ay,bx,by,color in self.drawedLines:
@@ -619,3 +645,4 @@ class SS():
 			draw.text((int(x+xoffset),int(y+yoffset)), text, fill=(0,0,0),font=self.font)
 
 		img.save("test.png")
+

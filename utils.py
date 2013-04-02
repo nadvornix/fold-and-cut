@@ -429,7 +429,7 @@ def getPath(point,n,direction=0):
 		pass 	# first node is last
 	return vertices
 
-def getFace(point,n,returns):
+def getFace(point,n):
 	p1=getPath(point,n,direction=0)
 	p2=getPath(n,point,direction=-1)
 

@@ -79,7 +79,7 @@ if __name__=="__main__":
 
 	s= SS()
 	s.create(polygon)
-	# s.create_creases()
+	s.create_creases()
 
 	
 	# LINES = clip_lines(LINES, (minX,maxX, minY,maxY))
