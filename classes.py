@@ -22,6 +22,7 @@ class Point():
 	def normalize(self,debug=False):
 		self.all=self.ss+self.contour
 
+		
 		if self.ss:
 			self.sort(self.ss, debug=False)
 		if self.contour:
@@ -105,7 +106,7 @@ class Point():
 class SS():
 	point_tolerance=1.5 # if two points are closer than this they are considered equal (more or less)
 	font = ImageFont.truetype("g.ttf", 50)
-	MAXDEPTH=0
+	MAXDEPTH=20
 
 	def __init__(self):
 		self.POINTS=[]
@@ -124,7 +125,7 @@ class SS():
 		"Convert polygon from list of vertices to straight skeleton"
 		
 		# convert to [(x,y), ....]
-		polygon = map(lambda x: tuple(map(int,x)), polygon)
+		polygon = map(lambda x: tuple(map(lambda y: int(round(y)),x)), polygon)
 		
 		# polygon has to be in counterclockwise order (if coordinates are interpreted as cartesian)
 		if clockwisePolygon(polygon):
@@ -134,6 +135,8 @@ class SS():
 		# in format [(type, x1,y1, x2,y2)...] where type can be from ("c","i","o") depending whether it is
 		# contour line, inner or outer SS. Each edge here are two times
 		rawSegments=self.run_CGAL(polygon)
+		if not rawSegments:
+			return None
 
 		# rawSegments=filter(lambda x: x[0] in ("i", "c"), rawSegments)		
 
@@ -196,16 +199,23 @@ class SS():
 		# extend lines on border to border
 		self.extendBorderLines()
 
-
-
+		return True
 
 	def run_CGAL(self, polygon):
 		# print polygon
 		pointsS = "\n".join(map(lambda x: "%s %s"%x, polygon))	# points in pairs per line
 
-		p = Popen("./ss", shell=True, stdin=PIPE, stdout=PIPE)
-		resS,dummy = p.communicate(pointsS)
+		# p = Popen("./ss", shell=True, stdin=PIPE, stdout=PIPE)
+		# resS,dummy = p.communicate(pointsS)
+		# print "vvvv"
+		# print resS
+
 		rawSegments=[]
+
+		resS = runWithTimeout("./ss", 10, pointsS)
+		if resS==None:
+			return None
+
 		for line in resS.split("\n"):
 			try:
 				type_, x1,y1,x2,y2 = line.split()
@@ -345,9 +355,9 @@ class SS():
 						####	THIS WILL BE EXECUTED ONCE PER CONTOUR EDGE:
 						contourA,contourB=edge
 
-						x=avg(contourA.x,contourB.x)
-						y=avg(contourA.y,contourB.y)
-						self.drawPoint(x, y, 3, color="#0FF")
+						# x=avg(contourA.x,contourB.x)
+						# y=avg(contourA.y,contourB.y)
+						# self.drawPoint(x, y, 3, color="#0FF")
 
 						halfFaceA,oA = getFace(point,n)
 						halfFaceB,oB = getFace(n,point)
@@ -357,7 +367,7 @@ class SS():
 							for i,vertex in enumerate(halfFace):
 								if vertex.is_inner():
 									prev=halfFace[i-1]
-									self.drawPoint(vertex.x, vertex.y, 3, color="#0F0")
+									# self.drawPoint(vertex.x, vertex.y, 3, color="#0F0")
 									if i==len(halfFace)-1:
 										next=halfFace[0]
 									else:
@@ -371,7 +381,7 @@ class SS():
 										startP=(vertex.x,vertex.y)
 										adjacentN = (prev,vertex,next)
 										
-										self.drawPoint(vertex.x, vertex.y, 2)
+										# self.drawPoint(vertex.x, vertex.y, 2)
 										self.drawPerpendicularSS(startP, halfFace, False, pairs(adjacentN), 0)
 										# else:
 										# 	drawline(vertex.x, vertex.y, vertex.x+20, vertex.y+20, "#000")
@@ -506,7 +516,7 @@ class SS():
 		# drawPoint(startX, startY, color="#000")
 		contour = getContour(face)
 
-		if not contour:	#draw line to end of canvas #TODO:Bug: the can be intersection althrough there is no contour!!!!
+		if not contour:	#draw line to end of canvas #TODO:Bug: there can be intersection althrough there is no contour!!!!
 		#fix: move this lower (when there is no intersection) as in drawPerpendicularContour
 			if not last:
 				return
@@ -515,7 +525,7 @@ class SS():
 			dy=startY-lastY
 			newpointX=startX+dx*100
 			newpointY=startY+dy*100
-			self.drawline(startX,startY,newpointX,newpointY,color="#00F")
+			self.drawline(startX,startY,newpointX,newpointY,color="#FF0")
 			return
 
 		cA,cB=contour
@@ -542,16 +552,21 @@ class SS():
 						bestIntersection=intersectionB
 
 		if not bestEdge:
-			"line to border (write it after there are some)"
-			if not last:
-				return
-			lastX,lastY=last
-			dx=startX-lastX
-			dy=startY-lastY
-			newpointX=startX+dx*100
-			newpointY=startY+dy*100
+			"line to border"
+			
+			dx=cA.x-cB.x
+			dy=cA.y-cB.y
+			print bestEdge, bestDistance, bestIntersection, last
+			newpointX=startX+dy*100
+			newpointY=startY-dx*100
+
 			self.drawline(startX,startY,newpointX,newpointY,color="#00F")
-			# print ":("
+			# self.drawPoint((cA.x+cB.x)/2, (cA.y+cB.y)/2, 3, color="#FF0")
+			# if last:
+				# self.drawPoint(last[0], last[1], 3, color="#000")
+
+			print startX,startY,newpointX,newpointY
+			print ":("
 			return
 
 		else:

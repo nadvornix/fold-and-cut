@@ -1,7 +1,10 @@
 from __future__ import division
-import math,random,itertools
+import math,random, sys
+import signal, subprocess
 
 EPSILON=0.01 #TODO: try bigger epsilon on vertex tolerance (epsilon=~3)?
+
+
 
 def randomColor():
 	choices = list("0123456789ABCDEF")
@@ -474,3 +477,22 @@ def otherFace(face,edge):
 		return f2,f2open
 	else:
 		assert False
+
+
+def runWithTimeout(cmd, timeout, stdin_=""):
+    proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+    class Alarm(Exception):
+        pass
+
+    def alarm_handler(signum, frame):
+        raise Alarm
+
+    signal.signal(signal.SIGALRM, alarm_handler)
+    signal.alarm(timeout)
+    try:
+        stdoutdata, stderrdata = proc.communicate(stdin_)
+        signal.alarm(0)  # reset the alarm
+        return stdoutdata
+    except Alarm:
+        return None
