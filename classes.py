@@ -13,18 +13,24 @@ class Point():
 	def __init__(self,x,y):
 		self.x=x
 		self.y=y
-		self.ss=[]	#list of incident vertices by Skeleton
+		
+		self.inside=[]
+		self.outside=[]
 		self.contour=[]	#incidents Vs by contour line
+
+		self.all=[] # in+out+contour
 
 	def __repr__(self):
 		return "Point(x=%s, y=%s)"%(self.x, self.y)
 
 	def normalize(self,debug=False):
-		self.all=self.ss+self.contour
+		self.all=self.inside+self.outside+self.contour
 
 		
-		if self.ss:
-			self.sort(self.ss, debug=False)
+		if self.inside:
+			self.sort(self.inside, debug=False)
+		if self.outside:
+			self.sort(self.outside, debug=False)
 		if self.contour:
 			self.sort(self.contour, debug=False)	#?
 		if self.all:	# this is always?
@@ -59,14 +65,20 @@ class Point():
 		del ns[:index]
 
 		if not all:
-			ns = filter(lambda x:x.is_inner(),ns)
+			ns = filter(lambda x:x.is_ss(),ns)
 		return ns
 
 	def is_contour(self):
 		return len(self.contour)>0
 
-	def is_inner(self):
+	def is_ss(self):
 		return not self.is_contour()
+
+	def is_inside(self):
+		return len(self.inside)>0 and len(self.outside)==0
+	
+	def is_outside(self):
+		return len(self.outside)>0 and len(self.inside)==0
 
 	def getFaces(self):	## NOT USED?
 		assert False
@@ -105,15 +117,20 @@ class Point():
 
 class SS():
 	point_tolerance=1.5 # if two points are closer than this they are considered equal (more or less)
-	font = ImageFont.truetype("g.ttf", 50)
+	font = ImageFont.truetype("g.ttf", 20)
 	MAXDEPTH=20
 
 	def __init__(self):
 		self.POINTS=[]
+		self.ENDPOINTS=[]
 		self.drawedPoints=[]
 		self.drawedLines=[]
 		self.drawedTexts=[]
 		self.img=None
+		self.resize=10
+
+		self.mountain ="#0FB"
+		self.valley="#0A0"
 
 	def __del__(self):
 		if self.img:
@@ -125,7 +142,7 @@ class SS():
 		"Convert polygon from list of vertices to straight skeleton"
 		
 		# convert to [(x,y), ....]
-		polygon = map(lambda x: tuple(map(lambda y: int(round(y)),x)), polygon)
+		polygon = map(lambda coords: tuple(map(lambda y: int(round(y*self.resize)),coords)), polygon)
 		
 		# polygon has to be in counterclockwise order (if coordinates are interpreted as cartesian)
 		if clockwisePolygon(polygon):
@@ -159,25 +176,33 @@ class SS():
 
 		# set neighbours (and prefer contour lines if possible)
 		for t,p1,p2 in segments:
-			if t in ("i","o"):
-				if p1 not in p2.ss and p2 not in p1.ss:
+			if t =="i":
+				if p1 not in p2.inside and p2 not in p1.inside:
 					if p1 not in p2.contour and p2 not in p1.contour:
-						p1.ss.append(p2)
-						p2.ss.append(p1)
+						p1.inside.append(p2)
+						p2.inside.append(p1)
+			elif t =="o":
+				if p1 not in p2.outside and p2 not in p1.outside:
+					if p1 not in p2.contour and p2 not in p1.contour:
+						p1.outside.append(p2)
+						p2.outside.append(p1)
 			elif t == "c":
 				if p1 not in p2.contour and p2 not in p1.contour:
-					if p1 in p2.ss:
-						p2.ss.remove(p1)
-					if p2 in p1.ss:
-						p1.ss.remove(p2)
+					if p1 in p2.inside:
+						p2.inside.remove(p1)
+					if p1 in p2.outside:
+						p2.outside.remove(p1)
+					if p2 in p1.inside:
+						p1.inside.remove(p2)
+					if p2 in p1.outside:
+						p1.outside.remove(p2)
 					p1.contour.append(p2)
 					p2.contour.append(p1)
 
 		# set (cyclic) order of neighbours as in planar embedding
 		for i, point in enumerate(self.points):
 			point.normalize()
-
-
+			
 		contour = filter(lambda p: p.is_contour(), self.points)
 
 		self.minX=reduce(min, map(lambda p:p.x, contour))
@@ -198,6 +223,8 @@ class SS():
 
 		# extend lines on border to border
 		self.extendBorderLines()
+
+		self.draw_SS()
 
 		return True
 
@@ -273,7 +300,7 @@ class SS():
 	def stripeBorder(self):
 		borderPoint=None
 		for p in self.points:
-			if len(p.ss)==1 and len(p.contour)==0:
+			if len(p.outside)==1 and len(p.contour)==0:
 				borderPoint=p
 				break
 		if not borderPoint:
@@ -282,15 +309,15 @@ class SS():
 
 		# outerFace, openFace = getFace(borderPoint.ss[0], borderPoint)
 
-		outerFace=getPath(borderPoint, borderPoint.ss[0],direction=0)
+		outerFace=getPath(borderPoint, borderPoint.outside[0],direction=0)
 		
 		while True:
 			start = outerFace[-1]
-			path = getPath(start,start.ss[0], direction=0)
+			path = getPath(start,start.outside[0], direction=0)
 			
 			outerFace+=path
 
-			if borderPoint.ss[0] in path:
+			if borderPoint.outside[0] in path:
 				break
 			# break
 
@@ -300,12 +327,12 @@ class SS():
 
 		for a,b in pairs(outerFace):
 			try:
-				a.ss.remove(b)
+				a.outside.remove(b)
 			except ValueError:
 				pass
 
 			try:
-				b.ss.remove(a)
+				b.outside.remove(a)
 			except ValueError:
 				pass
 
@@ -326,23 +353,60 @@ class SS():
 			self.points.append(newPoint)
 			return newPoint
 
-	def create_creases(self):
-		for v in self.points:
-			self.POINTS.append((v.x,v.y))
-
-		done=[]
-		for point in self.points:	#Debug: draw this graph
-			done.append(point)
-			for n in point.ss:
-				if n not in done:
-					self.drawline(n.x,n.y, point.x, point.y)
+	def draw_SS(self):
+		for point in self.points:
+			# for n in point.inside:
+			# 	if n not in done:
+			# 		self.drawLine(n.x,n.y, point.x, point.y, color="#0F0")
+			# for n in point.outside:
+			# 	if n not in done:
+			# 		self.drawLine(n.x,n.y, point.x, point.y, color="#000")
 			for n in point.contour:
-				if n not in done:
-					self.drawline(n.x,n.y, point.x, point.y, color="#FF0000")
+				self.drawLine(n.x,n.y, point.x, point.y, color="#F00")
 
+		inside_edges=[]
+		outside_edges=[]
+		for p in self.points:
+			if p.is_inside():
+				for q in p.inside:
+					if (p,q) not in inside_edges and (q,p) not in inside_edges:
+						inside_edges.append((p,q))
+			if p.is_outside():
+				for q in p.outside:
+					if (p,q) not in outside_edges and (q,p) not in outside_edges:
+						outside_edges.append((p,q)) 
+
+		color = {"inside":{True: self.valley,
+							False: self.mountain},
+				 "outside":{True: self.mountain,
+				 			False: self.valley}}
+
+		def draw_edge(a,b,side): #side="inside"/"outside"
+			x=avg(a.x, b.x)
+			y=avg(a.y, b.y)
+
+			f1,f1open=getFace(a, b)
+			c1A, c1B=getContour(f1)
+			f2,f2open=getFace(b,a)
+			c2A, c2B=getContour(f2)
+
+			self.drawLine(a.x,a.y, b.x, b.y, color=color[side][convexSS(c1A, c1B, c2A, c2B, x,y)])
+
+		for a,b in inside_edges:
+			draw_edge(a,b,"inside")
+
+		for a,b in outside_edges:
+			draw_edge(a,b,"outside")
+
+	def create_creases(self):
 		# Strategy: 1) take contour edge,
 		#			2) walk around and start perpendiculars for all verticies on incident faces
 		#				2a) draw perpendicular all all way to its end
+
+		for p in self.points: #make list of SS points
+			if p.is_ss():
+				self.POINTS.append((p.x,p.y))
+
 		edgesDone = []
 
 		for pid, point in enumerate(self.points):
@@ -355,17 +419,13 @@ class SS():
 						####	THIS WILL BE EXECUTED ONCE PER CONTOUR EDGE:
 						contourA,contourB=edge
 
-						# x=avg(contourA.x,contourB.x)
-						# y=avg(contourA.y,contourB.y)
-						# self.drawPoint(x, y, 3, color="#0FF")
-
 						halfFaceA,oA = getFace(point,n)
 						halfFaceB,oB = getFace(n,point)
 
 						# print len(halfFaceA), len(halfFaceB)
 						for halfFace in (halfFaceA, halfFaceB):
 							for i,vertex in enumerate(halfFace):
-								if vertex.is_inner():
+								if vertex.is_ss():
 									prev=halfFace[i-1]
 									# self.drawPoint(vertex.x, vertex.y, 3, color="#0F0")
 									if i==len(halfFace)-1:
@@ -377,35 +437,10 @@ class SS():
 									isecX,isecY = pointLineProjection(contourA.x,contourA.y,contourB.x,contourB.y, vertex.x,vertex.y)
 									aNext = angle(prev.x,prev.y, vertex.x,vertex.y, next.x,next.y)	#angle to next vertex
 									aIsec = angle(prev.x,prev.y, vertex.x,vertex.y, isecX,isecY)	#angle to intersection
-									if aNext>aIsec:	#if perpendicular goes to face (vs. go outside)
+									if aNext>aIsec and 0.001<aIsec<math.pi-0.001:	#if perpendicular goes to face (vs. go outside)
 										startP=(vertex.x,vertex.y)
 										adjacentN = (prev,vertex,next)
-										
-										# self.drawPoint(vertex.x, vertex.y, 2)
 										self.drawPerpendicularSS(startP, halfFace, False, pairs(adjacentN), 0)
-										# else:
-										# 	drawline(vertex.x, vertex.y, vertex.x+20, vertex.y+20, "#000")
-		# img=Image.new('RGB', (int(lenx), int(leny)), "#FFFFFF")
-		# draw = ImageDraw.Draw(img)
-		# for line in LINES:
-		# 	x1,y1,x2,y2,color=line
-		# 	draw.line((int(x1-minx), int(y1-miny), int(x2-minx), int(y2-miny)), fill=color)
-		# done=[]
-
-
-
-
-		# for point in ss.points:	#Debug: draw this graph
-		# 	done.append(point)
-		# 	for n in point.ss:
-		# 		if n not in done:
-		# 			draw.line((int(n.x-minx), int(n.y-miny), int(point.x-minx), int(point.y-miny)), fill="#0F0")
-		# 	for n in point.contour:
-		# 		if n not in done:
-		# 			draw.line((int(n.x-minx), int(n.y-miny), int(point.x-minx), int(point.y-miny)), fill="#FF0000")
-		
-
-		# return (minx,maxx, minx, maxx),LINES
 		return
 
 
@@ -421,17 +456,20 @@ class SS():
 		# print "depth",depth
 		# print "last",last
 
-		self.POINTS.append(startP)
-
 		startX,startY=startP
-		# drawPoint(startX,startY,color="#F00")
+		contour = adjacentE[0]
+
+		if self.isNearEndPoint(startX,startY, contour):
+		# if isNearList(startX,startY, self.ENDPOINTS, epsilon=5):
+			return
+
+		# self.POINTS.append(startP)
 
 		if len(adjacentE)!=1:  #just test if params are OK
 			print len(adjacentE)
 			print adjacentE
 			assert False 	#this has to be one edge, not more
 
-		contour = adjacentE[0]
 		cA,cB=contour
 		cAx, cAy= cA.x, cA.y
 		cBx, cBy= cB.x, cB.y
@@ -441,8 +479,6 @@ class SS():
 		point2x=startX-dy 	#auxiliary point - through this point will go perpendicular
 		point2y=startY+dx
 
-		# drawline(startX,startY,  startX-dy*0.1,startY+dx*0.1,color="#F00")
-
 		bestEdge=None
 		bestIntersection=None
 		bestDistance=float("inf")
@@ -450,10 +486,10 @@ class SS():
 		intersectA = pointLineProjection(cAx,cAy,cBx,cBy,startX,startY)
 		intersectAx,intersectAy = intersectA
 
-		for e in pairs(face,cyclic=not openFace):	##TODO:put this into function
+		for e in pairs(face, cyclic=not openFace):	## TODO:put this into function
 			eA,eB=e
 			if not isEdgeIn(e,adjacentE):
-				intersectionB = LIntersectionLS(startX,startY,point2x,point2y, eA.x,eA.y,eB.x,eB.y)
+				intersectionB = LIntersectionLS2(startX,startY,point2x,point2y, eA.x,eA.y,eB.x,eB.y)
 				if intersectionB:
 					intersectionBx,intersectionBy=intersectionB
 					dist = distance(startX,startY, intersectionBx,intersectionBy)
@@ -462,14 +498,11 @@ class SS():
 						bestEdge=e
 						bestIntersection=intersectionB
 
-		# print "best:"
-		# print bestIntersection
-		# print bestEdge
-
 		if bestIntersection:
 			bestIntersectionx, bestIntersectiony = bestIntersection
+
 			# drawPoint(bestIntersectionx,bestIntersectiony,color="#999")
-			self.drawline(bestIntersectionx,bestIntersectiony,startX,startY,color="#00F")
+			self.drawLine(bestIntersectionx,bestIntersectiony,startX,startY,color="#00F")
 
 			if self.inBox(bestIntersectionx, bestIntersectiony) \
 					and depth<self.MAXDEPTH \
@@ -481,16 +514,20 @@ class SS():
 					[bestEdge],
 					depth+1,
 					last=startP)
+			else:
+				self.ENDPOINTS.append((bestIntersection, contour))
 		else:
 			# perpendicular continue to border
 			if not last:
 				return
 			lastX,lastY=last
-			dx=startX-lastX
-			dy=startY-lastY
-			newpointX=startX+dx*100
-			newpointY=startY+dy*100
-			self.drawline(startX,startY,newpointX,newpointY,color="#00F")
+			l=distance(startX,startY, lastX,lastY)
+			dx=(startX-lastX)/l
+			dy=(startY-lastY)/l
+			newpointX=startX+dx*10000
+			newpointY=startY+dy*10000
+
+			self.drawLine(startX,startY,newpointX,newpointY,color="#00F")
 			return
 		return
 
@@ -511,13 +548,15 @@ class SS():
 		# print "adjacentE: ",adjacentE
 		# print "depth",depth
 		# print "last",last
-		self.POINTS.append(startP)
 		startX,startY=startP
-		# drawPoint(startX, startY, color="#000")
+		# print startX, startY
 		contour = getContour(face)
+		if self.isNearEndPoint(startX,startY, contour):
+		# if isNearList(startX,startY, self.ENDPOINTS, epsilon=5):
+			return
+		# self.POINTS.append(startP)
 
-		if not contour:	#draw line to end of canvas #TODO:Bug: there can be intersection althrough there is no contour!!!!
-		#fix: move this lower (when there is no intersection) as in drawPerpendicularContour
+		if not contour:
 			if not last:
 				return
 			lastX,lastY=last
@@ -525,7 +564,7 @@ class SS():
 			dy=startY-lastY
 			newpointX=startX+dx*100
 			newpointY=startY+dy*100
-			self.drawline(startX,startY,newpointX,newpointY,color="#FF0")
+			self.drawLine(startX,startY,newpointX,newpointY,color="#FF0") #TODO: yellow line? is it ever used?
 			return
 
 		cA,cB=contour
@@ -539,10 +578,10 @@ class SS():
 		bestIntersection=None
 		bestDistance=float("inf")
 
-		for e in pairs(face,cyclic = not openFace):	#find closest intersection
+		for e in pairs(face, cyclic = not openFace):	#find closest intersection
 			eA,eB=e
 			if not isEdgeIn(e,adjacentE):
-				intersectionB = LIntersectionLS(startX,startY,intersectAx,intersectAy, eA.x,eA.y,eB.x,eB.y)
+				intersectionB = LIntersectionLS2(startX,startY,intersectAx,intersectAy, eA.x,eA.y,eB.x,eB.y)
 				if intersectionB:
 					intersectionBx,intersectionBy=intersectionB
 					dist = distance(startX,startY, intersectionBx,intersectionBy)
@@ -553,32 +592,28 @@ class SS():
 
 		if not bestEdge:
 			"line to border"
-			
-			dx=cA.x-cB.x
-			dy=cA.y-cB.y
-			print bestEdge, bestDistance, bestIntersection, last
-			newpointX=startX+dy*100
-			newpointY=startY-dx*100
+			l=distance(cA.x, cA.y, cB.x,cB.y)
+			dx=(cA.x-cB.x)/l
+			dy=(cA.y-cB.y)/l
 
-			self.drawline(startX,startY,newpointX,newpointY,color="#00F")
-			# self.drawPoint((cA.x+cB.x)/2, (cA.y+cB.y)/2, 3, color="#FF0")
-			# if last:
-				# self.drawPoint(last[0], last[1], 3, color="#000")
+			newpointX=startX+dy*10000
+			newpointY=startY-dx*10000
 
-			print startX,startY,newpointX,newpointY
-			print ":("
+			self.drawLine(startX,startY,newpointX,newpointY,color="#00F")
 			return
-
 		else:
 			bestIntersectionx, bestIntersectiony = bestIntersection
-			self.drawline(startX,startY,bestIntersectionx, bestIntersectiony, color="#0000FF")
-			# drawPoint(bestIntersectionx, bestIntersectiony, color="#F00")
+
+			dx=bestIntersectionx-startX
+			dy=bestIntersectiony-startY
+
+			self.drawLine(startX,startY,bestIntersectionx, bestIntersectiony, color="#0000FF")
 			#if we didn't run away from canvas and
 				#didn't go into too deep recursion
 				#and perpendicular didn't run into vertex
 			if self.inBox(bestIntersectionx, bestIntersectiony) \
 					and depth<self.MAXDEPTH\
-					and not isNearList(bestIntersectionx,bestIntersectiony, self.POINTS, epsilon=5):
+					and (not isNearList(bestIntersectionx,bestIntersectiony, self.POINTS, epsilon=5)):
 				
 				otherF, openF = otherFace(face, bestEdge)
 				if isContourE(*bestEdge):
@@ -597,11 +632,21 @@ class SS():
 										last=startP)
 			else:
 				pass
-				# print bestIntersectionx, bestIntersectiony
-				# print inBox(bestIntersectionx, bestIntersectiony)
-				# print depth<MAXDEPTH
-				# print not isNearList(bestIntersectionx,bestIntersectiony, POINTS, epsilon=5)
-				# print "outside"
+				# print "--"
+				# print self.inBox(bestIntersectionx, bestIntersectiony)
+				# print depth<self.MAXDEPTH, depth
+				# print not isNearList(bestIntersectionx,bestIntersectiony, self.POINTS, epsilon=5)
+				# if depth>=self.MAXDEPTH:
+				# 	self.drawPoint(startX, startY, r=10, color="#FF0")
+				# 	self.drawPoint(bestIntersectionx, bestIntersectiony, r=5, color="#000")
+
+	def isNearEndPoint(self, startX, startY, contour):
+		for (x,y),edge in self.ENDPOINTS:
+			epsilon=1
+			if distance(x,y, startX,startY)<epsilon:
+				if sameEdge(edge,contour):
+					return True
+		return False
 
 	def inBox(self, x,y):
 		return self.xmin<=x<=self.xmax and self.ymin<=y<=self.ymax
@@ -626,38 +671,43 @@ class SS():
 			p.normalize()
 
 
-	def drawPoint(self, x,y,r=10,color="#FF00FF"):
+	def drawPoint(self, x,y,r=3,color="#FF00FF"):
 		self.drawedPoints.append((x,y,r,color))
 		# draw.ellipse((int(x-minx-r), int(y-miny-r), int(x-minx+r), int(y-miny+r)),fill=color)
 
-	def drawline(self,  x1,y1, x2,y2, color="#00FF00"):
+	def drawLine(self,  x1,y1, x2,y2, color="#00FF00"):
 		# draw.line((int(x1-minx), int(y1-miny), int(x2-minx), int(y2-miny)), fill=color)
 		# LINES.append( (x1,y1, x2,y2, color))
 		self.drawedLines.append( (x1,y1,x2,y2,color))
 
 
-	def drawtext(self, x,y,text):
+	def drawText(self, x,y,text):
 		self.drawedTexts.append( (x,y,text) )
 		# draw.text((int(x-minx),int(y-miny)),text,fill=(0,0,0),font=font)
 
 	def drawit(self):
 		# xoffset = (xlen+self.FRAME-self.lenX)/2 - self.minX
 		# yoffset = (ylen+self.FRAME-self.lenY)/2 - self.minY
+		print "drawit"
+		# resize = self.resize
+		resize=2
+		xoffset=-self.xmin/resize
+		yoffset=-self.ymin/resize
 
-		xoffset=-self.xmin
-		yoffset=-self.ymin
+		xsize = min(int(self.xlen/resize),10000)
+		ysize = min(int(self.ylen/resize),10000)
 
-		img=Image.new('RGB', (int(self.xlen), int(self.ylen)), "#FFFFFF")
+		img=Image.new('RGB', (xsize,ysize), "#FFFFFF")
 		draw = ImageDraw.Draw(img)
 
 		for ax,ay,bx,by,color in self.drawedLines:
-			draw.line((int(ax+xoffset), int(ay+yoffset), int(bx+xoffset), int(by+yoffset)), fill=color)
+			draw.line((int(ax/resize+xoffset), int(ay/resize+yoffset), int(bx/resize+xoffset), int(by/resize+yoffset)), fill=color)
 
 		for x,y, r, color in self.drawedPoints:
-			draw.ellipse((int(x+xoffset-r), int(y+yoffset-r), int(x+xoffset+r), int(y+yoffset+r)), fill=color)
+			draw.ellipse((int(x/resize+xoffset-r), int(y/resize+yoffset-r), int(x/resize+xoffset+r), int(y/resize+yoffset+r)), fill=color)
 
 		for x,y, text in self.drawedTexts:
-			draw.text((int(x+xoffset),int(y+yoffset)), text, fill=(0,0,0),font=self.font)
+			draw.text((int(x/resize+xoffset),int(y/resize+yoffset)), text, fill=(0,0,0),font=self.font)
 
 		img.save("test.png")
 

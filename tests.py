@@ -148,6 +148,20 @@ class TestUtils(unittest.TestCase):
 		self.assertEqual(x,4)
 		self.assertEqual(y,4)
 
+	def test_LIntersectionLS2(self):
+		self.assertEqual(LIntersectionLS2(-1,-1, 5,5, 4,5, 3,10),None)
+		x,y=LIntersectionLS2(-1,-1, 5,5, 3,5,5,3)
+		self.assertEqual(x,4)
+		self.assertEqual(y,4)
+
+	def test_rturn(self):
+		self.assertTrue(rturn(10,0, 0,0, 0,10))
+		self.assertFalse(rturn(10,0, 0,0, 1,-10))
+		self.assertFalse(rturn(0,10, 0,0, 10,0))
+
+	def test_pInsideConvexAngle(self):
+		self.assertTrue(pInsideConvexAngle(0,10, 0,0, 10,0,  5,5))
+
 	def test_isNearList(self):
 		self.assertTrue(isNearList(5,5,[(4,4),(3,2),(5.1,5.1)], epsilon=0.15))
 		self.assertFalse(isNearList(5,5,[(4,4),(3,2),(5.1,5.1)], epsilon=0.14))
@@ -279,10 +293,10 @@ class TestPoint(unittest.TestCase):
 	def test_is_contourAndSS(self):
 		for p in [self.a,self.b,self.c,self.d]:
 			self.assertTrue(p.is_contour())
-			self.assertFalse(p.is_inner())
+			self.assertFalse(p.is_ss())
 
 		self.assertFalse(self.e.is_contour())
-		self.assertTrue(self.e.is_inner())
+		self.assertTrue(self.e.is_ss())
 
 	def test_normalize(self):
 		self.e.ss=[self.a,self.b,self.d,self.c]

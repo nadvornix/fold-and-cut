@@ -4,8 +4,6 @@ import signal, subprocess
 
 EPSILON=0.01 #TODO: try bigger epsilon on vertex tolerance (epsilon=~3)?
 
-
-
 def randomColor():
 	choices = list("0123456789ABCDEF")
 	code = "".join([random.choice(choices) for i in range(6)])
@@ -23,6 +21,10 @@ def angle(Ax,Ay, Bx,By, Cx,Cy):
 	secondDy=float(By)-Cy
 	j = math.pi+math.atan2( firstDx*secondDy - secondDx*firstDy, firstDx*secondDx + firstDy*secondDy)
 	return j
+
+def rturn(Ax,Ay,Bx,By,Cx,Cy):
+	"determines if it is turning right in cartesian coords"
+	return 0<=angle(Ax,Ay,Bx,By,Cx,Cy)<=math.pi
 
 def pointLineProjection(Ax,Ay,Bx,By,Px,Py):
 	"returns coordinates of projection (S) of point p to line --A---B--"
@@ -51,6 +53,7 @@ def calculateYAxisIntersect(p, m):
 # In non parallel cases the tuple will contain just one point.
 # For parallel lines that lay on top of one another the tuple will contain
 # all four points of the two lines
+# Source: http://www.pygame.org/wiki/IntersectingLineDetection
 def getIntersectPoint(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 	p1=p1x,p1y
 	p2=p2x,p2y
@@ -140,7 +143,7 @@ def nonequalOneFloat(thing, a,b):
 	else:
 		return None
 
-def onSameLineF(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
+def onSameLineF(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y,epsilon=0.01):
 	"if two (infinite) lines lay on one another"
 	p1=p1x,p1y
 	p2=p2x,p2y
@@ -150,7 +153,7 @@ def onSameLineF(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 	m1 = calculateGradient(p1, p2)
 	m2 = calculateGradient(p3, p4)
 
-	if (m1==None and m2==None) or (None not in (m1,m2) and abs(m1-m2) < 0.01): #parallel
+	if (m1==None and m2==None) or (None not in (m1,m2) and abs(m1-m2) < epsilon): #parallel
 		b1, b2 = None, None # vertical lines have no b value
 		if m1 is not None:
 		   b1 = calculateYAxisIntersect(p1, m1)
@@ -159,8 +162,8 @@ def onSameLineF(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 		   b2 = calculateYAxisIntersect(p3, m2)
 
 		# If these parallel lines lay on one another
- #TODO: favorizuje cary blizko pocatku - ma u nich vetsi toleranci ##BUG
-		if (b1==None and b2==None) or (abs(b1-b2) <0.01):
+		## BUG: lines near origin have bigger tolerance
+		if (b1==None and b2==None) or (abs(b1-b2) < epsilon):
 		   return True
 		else:
 		   return False
@@ -182,26 +185,16 @@ def splitSegments(rawSegments, point):
 			newSegments.append((type_,Ax,Ay,Bx,By)) #no change
 	return newSegments
 
-# def isLF(x,y):
-# 	return 0.999*x <= y
 
+#source: http://www.bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
 def ccw(Ax,Ay,Bx,By,Cx,Cy):
 	"Are A,B,C in counterclokwise direction?"
 	return (Cy-Ay)*(Bx-Ax) > (By-Ay)*(Cx-Ax)
-
-# def ccwF(Ax,Ay,Bx,By,Cx,Cy):
-# 	"Are A,B,C in counterclokwise direction?"
-# 	return (Cy-Ay)*(Bx-Ax) >= (By-Ay)*(Cx-Ax)-0.0001
 
 def lineSegmentsIntersectionQ(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 	## BUG: say false with overlaping 
 	return (ccw(p1x,p1y,p3x,p3y,p4x,p4y) != ccw(p2x,p2y,p3x,p3y,p4x,p4y)) and \
 				(ccw(p1x,p1y,p2x,p2y,p3x,p3y) != ccw(p1x,p1y,p2x,p2y,p4x,p4y))
-
-# def lineSegmentsIntersectionQF(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
-# 	return (ccwF(p1x,p1y,p3x,p3y,p4x,p4y) != ccwF(p2x,p2y,p3x,p3y,p4x,p4y)) and \
-# 				(ccwF(p1x,p1y,p2x,p2y,p3x,p3y) != ccwF(p1x,p1y,p2x,p2y,p4x,p4y))
-
 
 def lineSegmentsIntersection(p1x,p1y, p2x,p2y, p3x,p3y, p4x,p4y):
 	"""Intersection point of two line segments
@@ -225,7 +218,6 @@ def LIntersectionLS(lpAx,lpAy,lpBx,lpBy, lsAx,lsAy,lsBx,lsBy,epsilon=1):
 	lsminY=min(lsAy,lsBy)
 	lsmaxY=max(lsAy,lsBy)
 
-
 	#as if it would be both infinite lines
 	i=getIntersectPoint(lpAx,lpAy,lpBx,lpBy, lsAx,lsAy,lsBx,lsBy)
 
@@ -238,6 +230,29 @@ def LIntersectionLS(lpAx,lpAy,lpBx,lpBy, lsAx,lsAy,lsBx,lsBy,epsilon=1):
 			return i
 
 	return None
+
+def LIntersectionLS2(lpAx,lpAy,lpBx,lpBy, lsAx,lsAy,lsBx,lsBy):
+	"get coordinates of intersection of line segment and line."
+	"Strategy: prolong line-segment defining line so it is practically 'infinite' line"
+
+	dist = max([ distance(lpAx,lpAy,lsAx,lsAy),
+				 distance(lpAx,lpAy,lsBx,lsBy),
+				 distance(lpBx,lpBy,lsAx,lsAy),
+				 distance(lpBx,lpBy,lsBx,lsBy)
+			])
+	l = distance(lpAx,lpAy,lpBx,lpBy)	## length of segment defining line
+	dx = (lpBx-lpAx)/l 					## it's orientation
+	dy = (lpBy-lpAy)/l
+
+	# this will (in half of cases) reverse orientation of defining line-segment.
+	lpAx = lpAx-dx*dist*100
+	lpAy = lpAy-dy*dist*100
+
+	lpBx = lpBx+dx*dist*100
+	lpBy = lpBy+dy*dist*100
+
+	return lineSegmentsIntersection(lsAx,lsAy,lsBx,lsBy, lpAx,lpAy,lpBx,lpBy)
+
 
 def isNearList(px,py,l,epsilon=1e-4):
 	for x,y in l:
@@ -252,7 +267,13 @@ def isNearListPoints(px,py,l,epsilon=10e-3):
 			return True
 	return False
 
-def pointOnSegment(Ax,Ay,Bx,By, Px,Py, epsilonDistance=0.1):
+def pointOnLine(Ax,Ay,Bx,By, Px,Py, epsilon=0.01):
+	ix,iy=pointLineProjection(Ax,Ay,Bx,By, Px,Py)
+	dist = distance(ix,iy, Px,Py)
+	
+	return dist<=epsilon
+
+def pointOnSegment(Ax,Ay,Bx,By, Px,Py, epsilonDistance=0.01, e2=0.01):
 	"say true/false if is point on segment"
 	"if it is on corner then answer is True"
 	"how far from line it can be is set by epsilonDistance"
@@ -270,9 +291,8 @@ def pointOnSegment(Ax,Ay,Bx,By, Px,Py, epsilonDistance=0.1):
 	minY,maxY= min(Ay,By),max(Ay,By)
 
 	#if it is in bounding box of segment:
-	e=0.01 #epsilon for tolerance
+	e=e2 #epsilon for tolerance
 	return minX-e<=ix<=maxX+e and minY-e<=iy<=maxY+e
-
 
 def intersection(la,lb):
 	"Set intersection for lists"
@@ -342,7 +362,6 @@ def inflate_rectangle(minX, maxX, minY,maxY, ratio=0.2):
 
 	return (minX-dX, maxX+dX, minY-dY,maxY+dY)
 
-
 def clip(line, border):
 	"clip single line"
 
@@ -410,8 +429,6 @@ def colorString2RGB(s):
 		s="#"+s[1]+s[1]+s[2]+s[2]+s[3]+s[3]
 	return c2n(s[1:3]),c2n(s[3:5]),c2n(s[5:7])
 
-
-
 def getPath(point,n,direction=0):
 	"""go still in direction point->n.
 	direction=0 means go as left as you can, direction=-1 means right"""
@@ -464,6 +481,18 @@ def isEdgeIn(e,l):
 			return True
 	return False
 
+def isInsideEdge(a,b):
+	return a in b.inside and b in a.inside
+
+def isOutsideEdge(a,b):
+	return a in b.outside and b in a.outside
+
+def isSSEdge(a,b):
+	return isInsideEdge(a,b) or isOutsideEdge(a,b)
+
+def isContourEdge(a,b):
+	return a in b.contour and b in a.contour
+
 def otherFace(face,edge):
 	"around `edge` are two faces. This returns that distinct from `face`"
 	eA,eB=edge
@@ -478,6 +507,31 @@ def otherFace(face,edge):
 	else:
 		assert False
 
+def pInsideConvexAngle(Ax, Ay, ix, iy, Bx, By, Px,Py):
+	"determines if x,y is inside convex side of angle A-i-B. Special/border cases are undefined"
+	orient = rturn(Ax, Ay, ix, iy, Bx, By)
+
+	return 	rturn(Ax, Ay, ix, iy, Px, Py) == orient and \
+			rturn(Bx, By, ix, iy, Px, Py) == (not orient)
+
+def convexSS(c1A, c1B, c2A, c2B, x,y):
+	ip = getIntersectPoint(c1A.x, c1A.y, c1B.x, c1B.y, c2A.x, c2A.y, c2B.x, c2B.y)
+	if not ip: #parallel
+			return True # special case: parallel lines are like convex
+
+	ix,iy=ip
+
+	if 	pointOnLine(c1A.x, c1A.y, c1B.x, c1B.y, c2A.x, c2A.y, epsilon=1e-4) and \
+		pointOnLine(c1A.x, c1A.y, c1B.x, c1B.y, c2B.x, c2B.y, epsilon=1e-4):
+		return False # Special case: segments on same line are like reflex 
+
+	c1x = avg(c1A.x, c1B.x)
+	c1y = avg(c1A.y, c1B.y)
+
+	c2x = avg(c2A.x, c2B.x)
+	c2y = avg(c2A.y, c2B.y)
+
+	return pInsideConvexAngle(c1x, c1y, ix, iy, c2x, c2y, x,y)
 
 def runWithTimeout(cmd, timeout, stdin_=""):
     proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
