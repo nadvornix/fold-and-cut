@@ -61,8 +61,9 @@ if __name__=="__main__":
 	if r==None:
 		print "error during creating straight skeleton"
 		sys.exit()
+
 	s.create_creases()
 
 	# LINES = clip_lines(LINES, (minX,maxX, minY,maxY))
 
-	s.drawit()
+	s.drawit(medium="png")

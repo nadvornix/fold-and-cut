@@ -18,6 +18,8 @@ class Point():
 		self.outside=[]
 		self.contour=[]	#incidents Vs by contour line
 
+		self.perps=[] # perpendiculars
+
 		self.all=[] # in+out+contour
 
 	def __repr__(self):
@@ -116,7 +118,6 @@ class Point():
 		return faces
 
 class SS():
-	point_tolerance=1.5 # if two points are closer than this they are considered equal (more or less)
 	font = ImageFont.truetype("g.ttf", 20)
 	MAXDEPTH=20
 
@@ -129,7 +130,7 @@ class SS():
 		self.img=None
 		self.resize=10
 
-		self.mountain ="#0FB"
+		self.mountain ="#0FF"
 		self.valley="#0A0"
 
 	def __del__(self):
@@ -321,10 +322,6 @@ class SS():
 				break
 			# break
 
-		# for p in outerFace:
-		# 	print p
-		# 	self.drawPoint(p.x, p.y, color="#F55")
-
 		for a,b in pairs(outerFace):
 			try:
 				a.outside.remove(b)
@@ -342,30 +339,28 @@ class SS():
 				self.points.remove(p)
 
 
-	def get_point(self, x, y):
+	def get_point(self, x, y, epsilon=1.5):
 		"""get or create point on coords x,y"""
+		"epsilon: if two points are closer than this they are considered equal (more or less)"
 
 		for point in self.points:
-			if distance(x,y, point.x, point.y) < self.point_tolerance:
+			if distance(x,y, point.x, point.y) < epsilon:
 				return point
-		else:	#point is not already there => create new
+		else:	##point is not already there => create new
 			newPoint = Point(x,y)
 			self.points.append(newPoint)
 			return newPoint
 
 	def draw_SS(self):
+		done = []
 		for point in self.points:
-			# for n in point.inside:
-			# 	if n not in done:
-			# 		self.drawLine(n.x,n.y, point.x, point.y, color="#0F0")
-			# for n in point.outside:
-			# 	if n not in done:
-			# 		self.drawLine(n.x,n.y, point.x, point.y, color="#000")
 			for n in point.contour:
-				self.drawLine(n.x,n.y, point.x, point.y, color="#F00")
+				if (point,n) not in done and (n,point) not in done:
+					self.drawLine(n.x,n.y, point.x, point.y, color="#F00")
+					done.append( (point, n) )
 
-		inside_edges=[]
-		outside_edges=[]
+		inside_edges = []
+		outside_edges = []
 		for p in self.points:
 			if p.is_inside():
 				for q in p.inside:
@@ -441,8 +436,24 @@ class SS():
 										startP=(vertex.x,vertex.y)
 										adjacentN = (prev,vertex,next)
 										self.drawPerpendicularSS(startP, halfFace, False, pairs(adjacentN), 0)
+		
+		done=[]
+		for p in self.points:
+			for q in p.perps:
+				if q not in done:
+					self.drawLine(p.x,p.y, q.x,q.y,color="#00F")
+			done.append(p)
+
 		return
 
+	def addPerpendicular(self, aX,aY, bX, bY):
+		A=self.get_point(aX, aY, epsilon=0.01)
+		B=self.get_point(bX, bY, epsilon=0.01)
+
+		if B not in A.perps:
+			A.perps.append(B)
+		if A not in B.perps:
+			B.perps.append(A)
 
 	def drawPerpendicularContour(self, startP, face,openFace, adjacentE, depth=0,last=None):
 		"""
@@ -459,9 +470,9 @@ class SS():
 		startX,startY=startP
 		contour = adjacentE[0]
 
-		if self.isNearEndPoint(startX,startY, contour):
+		# if self.isNearEndPoint(startX,startY, contour):
 		# if isNearList(startX,startY, self.ENDPOINTS, epsilon=5):
-			return
+			# return
 
 		# self.POINTS.append(startP)
 
@@ -502,7 +513,7 @@ class SS():
 			bestIntersectionx, bestIntersectiony = bestIntersection
 
 			# drawPoint(bestIntersectionx,bestIntersectiony,color="#999")
-			self.drawLine(bestIntersectionx,bestIntersectiony,startX,startY,color="#00F")
+			self.addPerpendicular(bestIntersectionx,bestIntersectiony,startX,startY)
 
 			if self.inBox(bestIntersectionx, bestIntersectiony) \
 					and depth<self.MAXDEPTH \
@@ -526,8 +537,7 @@ class SS():
 			dy=(startY-lastY)/l
 			newpointX=startX+dx*10000
 			newpointY=startY+dy*10000
-
-			self.drawLine(startX,startY,newpointX,newpointY,color="#00F")
+			self.addPerpendicular(startX,startY,newpointX,newpointY)
 			return
 		return
 
@@ -559,12 +569,13 @@ class SS():
 		if not contour:
 			if not last:
 				return
+			## TODO: is this ever used?
 			lastX,lastY=last
 			dx=startX-lastX
 			dy=startY-lastY
 			newpointX=startX+dx*100
 			newpointY=startY+dy*100
-			self.drawLine(startX,startY,newpointX,newpointY,color="#FF0") #TODO: yellow line? is it ever used?
+			addPerpendicular(startX,startY,newpointX,newpointY)
 			return
 
 		cA,cB=contour
@@ -598,16 +609,14 @@ class SS():
 
 			newpointX=startX+dy*10000
 			newpointY=startY-dx*10000
-
-			self.drawLine(startX,startY,newpointX,newpointY,color="#00F")
+			self.addPerpendicular(startX,startY,newpointX,newpointY)
 			return
 		else:
 			bestIntersectionx, bestIntersectiony = bestIntersection
 
 			dx=bestIntersectionx-startX
 			dy=bestIntersectiony-startY
-
-			self.drawLine(startX,startY,bestIntersectionx, bestIntersectiony, color="#0000FF")
+			self.addPerpendicular(startX,startY,bestIntersectionx, bestIntersectiony)
 			#if we didn't run away from canvas and
 				#didn't go into too deep recursion
 				#and perpendicular didn't run into vertex
@@ -671,26 +680,18 @@ class SS():
 			p.normalize()
 
 
-	def drawPoint(self, x,y,r=3,color="#FF00FF"):
+	def drawPoint(self, x,y,r=3,color="#F0F"):
 		self.drawedPoints.append((x,y,r,color))
-		# draw.ellipse((int(x-minx-r), int(y-miny-r), int(x-minx+r), int(y-miny+r)),fill=color)
 
-	def drawLine(self,  x1,y1, x2,y2, color="#00FF00"):
-		# draw.line((int(x1-minx), int(y1-miny), int(x2-minx), int(y2-miny)), fill=color)
-		# LINES.append( (x1,y1, x2,y2, color))
+	def drawLine(self,  x1,y1, x2,y2, color="#0F0"):
 		self.drawedLines.append( (x1,y1,x2,y2,color))
-
 
 	def drawText(self, x,y,text):
 		self.drawedTexts.append( (x,y,text) )
-		# draw.text((int(x-minx),int(y-miny)),text,fill=(0,0,0),font=font)
 
-	def drawit(self):
-		# xoffset = (xlen+self.FRAME-self.lenX)/2 - self.minX
-		# yoffset = (ylen+self.FRAME-self.lenY)/2 - self.minY
+	def drawit(self, medium="png"):
 		print "drawit"
-		# resize = self.resize
-		resize=2
+		resize=1
 		xoffset=-self.xmin/resize
 		yoffset=-self.ymin/resize
 
@@ -700,14 +701,36 @@ class SS():
 		img=Image.new('RGB', (xsize,ysize), "#FFFFFF")
 		draw = ImageDraw.Draw(img)
 
-		for ax,ay,bx,by,color in self.drawedLines:
-			draw.line((int(ax/resize+xoffset), int(ay/resize+yoffset), int(bx/resize+xoffset), int(by/resize+yoffset)), fill=color)
+		r=lambda: random.randint(-5,5)
+		r=lambda:0
+		if medium=="png":
+			for ax,ay,bx,by,color in self.drawedLines:
+				draw.line((int(ax/resize+xoffset)+r(), int(ay/resize+yoffset)+r(), int(bx/resize+xoffset)+r(), int(by/resize+yoffset)+r()), fill=color)
 
-		for x,y, r, color in self.drawedPoints:
-			draw.ellipse((int(x/resize+xoffset-r), int(y/resize+yoffset-r), int(x/resize+xoffset+r), int(y/resize+yoffset+r)), fill=color)
+			for x,y, r, color in self.drawedPoints:
+				draw.ellipse((int(x/resize+xoffset-r), int(y/resize+yoffset-r), int(x/resize+xoffset+r), int(y/resize+yoffset+r)), fill=color)
 
-		for x,y, text in self.drawedTexts:
-			draw.text((int(x/resize+xoffset),int(y/resize+yoffset)), text, fill=(0,0,0),font=self.font)
+			for x,y, text in self.drawedTexts:
+				draw.text((int(x/resize+xoffset),int(y/resize+yoffset)), text, fill=(0,0,0),font=self.font)
 
-		img.save("test.png")
+			img.save("test.png")
+		elif medium=="svg":
+			import pysvg.structure
+			import pysvg.builders
+			import pysvg.text
 
+			svg_document = pysvg.structure.Svg()
+
+			shape_builder = pysvg.builders.ShapeBuilder()
+
+			for ax,ay,bx,by,color in self.drawedLines:
+				svg_document.addElement(shape_builder.createLine(int(ax/resize+xoffset), int(ay/resize+yoffset), int(bx/resize+xoffset), int(by/resize+yoffset), strokewidth=2, stroke=color))
+
+			for x,y, r, color in self.drawedPoints:
+				svg_document.addElement(shape_builder.createCircle(cx=int(x/resize+xoffset), cy=int(y/resize+yoffset), r=r, fill=color))
+
+			for x,y, text in self.drawedTexts:
+				t=pysvg.text.Text(x=int(x/resize+xoffset),y=int(y/resize+yoffset),content=text)
+				svg_document.addElement(t)
+
+			svg_document.save("test.svg")
